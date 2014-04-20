@@ -3,9 +3,9 @@
 /* Each descriptor is 1024 Byte which is the same as block size */
 
 typedef struct file_descriptor {
-char fname[64]; /* filename */
+char fname[255]; /* filename */
 int fsize; /* file size */
-uint16_t bid[30]; /* block id of the file */
+uint16_t bid[382]; /* block id of the file */
 }file_desc;
 
 struct entry {
@@ -14,13 +14,19 @@ uint8_t type; /* type of entry: file=1 or directory=0 */
 };
 
 typedef struct dir_descriptor {
-char dname[64]; /* directory name */
+char dname[255]; /* directory name */
 int dnum; /* how many files and directories in it? */
-struct entry e[15]; /* entry block of the files and directories */
+struct entry e[191]; /* entry block of the files and directories */
 }dir_desc;
     
 typedef struct superblock {
 int root_bid; /* block id of root directory */
 int fs_size; /* size of the file system */
-uint32_t bitmap; /* bitmap of whether a block is occupied */
+/* 40 * 1024 blocks means 40 * 1024 bits for bitmap */
+/* 2 blocks needed */
+uint16_t bitmap_bid[2]; /* bitmap of whether a block is occupied */
 }superblock;
+
+typedef struct block {
+uint8_t block[1024];
+}block;

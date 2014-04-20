@@ -10,7 +10,7 @@
 /*--------------------------------------------------------------------------------*/
 
 int debug = 0;	// extra output; 1 = on, 0 = off
-
+void *disk = NULL;
 /*--------------------------------------------------------------------------------*/
 
 /* The input file (stdin) represents a sequence of file-system commands,
@@ -70,6 +70,10 @@ struct action {
 void parse(char *buf, int *argc, char *argv[]);
 
 #define LINESIZE 128
+#define DISKSIZE (40*1024*1024)
+#define BLOCKSIZE 1024
+#define BLOCKSIZEWORD (1024 / 4)
+#define BLOCKNUM (DISKSIZE / BLOCKSIZE) /* how many blocks */
 
 /*--------------------------------------------------------------------------------*/
 
@@ -116,11 +120,94 @@ int main(int argc, char *argv[])
 }
 
 /*--------------------------------------------------------------------------------*/
+void clear_bit(uint32_t *bitmap, int n)
+{
+  int word = n / 32;
+  int bit = n % 32;
+
+  bitmap[word] &= ~(1 << bit);
+}
+
+void set_bit(uint32_t *bitmap, int n)
+{
+  int word = n / 32;
+  int bit = n % 32;
+
+  bitmap[word] |= 1 << bit;
+}
+/*--------------------------------------------------------------------------------*/
+void print_bitmap(uint32_t *bitmap, int n)
+{
+  int i;
+  printf("print_bitmap");
+  for (i = 0; i < n; i++) {
+    if (i % 4 == 0)
+      printf("\n");
+    printf("%x  ", bitmap[i]);
+  }
+  printf("\n");
+}
+
+void print_block(void *disk, int bid)
+{
+  int i;
+  block b = ((block *)disk)[bid];
+
+  printf("print_block %d", bid);
+  for (i = 0; i < BLOCKSIZE; i++) {
+    if (i % 16 == 0)
+      printf("\n");
+    printf("%x ", b.block[i]);
+  }
+  printf("\n");
+}
+
+/*--------------------------------------------------------------------------------*/
+void write_block(void *disk, void *content, int bid)
+{
+  block *b = &((block *)disk)[bid];
+  memcpy(b, content, BLOCKSIZE);
+}
+
+void *read_block(void *disk, int bid)
+{
+  return &((block *) disk)[bid];
+}
+/*--------------------------------------------------------------------------------*/
 
 int do_root(char *name, char *size)
 {
+  superblock sb;
+  uint32_t bitmap[BLOCKSIZEWORD];
+  dir_desc root;
+
+  /* initialize superblock */
+  disk = malloc(DISKSIZE);
+  memset(bitmap, 0, sizeof(uint32_t) * BLOCKSIZEWORD);
+  set_bit(bitmap, 0); /* block 0 for superblock */
+
+  /* block 1 for root directory */
+  memset(&root, 0, sizeof(dir_desc));
+  strcpy(root.dname, "root");
+  set_bit(bitmap, 1);
+
+  sb.root_bid = 1;
+  sb.fs_size = DISKSIZE;
+
+  /* block 2 and 3 for bitmap */
+  set_bit(bitmap, 2);
+  sb.bitmap_bid[0] = 2;
+  set_bit(bitmap, 3);
+  sb.bitmap_bid[1] = 3;
+
+  /* write descriptors to blocks*/
+  write_block(disk, &sb, 0);
+  write_block(disk, &root, 1);
+  write_block(disk, bitmap, 2);
+  write_block(disk, &bitmap[512], 3);
+
   if (debug) printf("%s\n", __func__);
-  return -1;
+  return 0;
 }
 
 int do_print(char *name, char *size)
@@ -179,6 +266,7 @@ int do_szfil(char *name, char *size)
 
 int do_exit(char *name, char *size)
 {
+  free(disk);
   if (debug) printf("%s\n", __func__);
   exit(0);
   return 0;
