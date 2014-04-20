@@ -74,8 +74,7 @@ void parse(char *buf, int *argc, char *argv[]);
 #define BLOCKSIZE 1024
 #define BLOCKSIZEWORD (1024 / 4)
 #define BLOCKNUM (DISKSIZE / BLOCKSIZE) /* how many blocks */
-#define BIT 32
-#define BITMAPSIZEWORD (DISKSIZE / BLOCKSIZE / BIT)
+#define BITMAPSIZEWORD (DISKSIZE / BLOCKSIZE / 32)
 
 /*--------------------------------------------------------------------------------*/
 
@@ -124,34 +123,34 @@ int main(int argc, char *argv[])
 /*--------------------------------------------------------------------------------*/
 void clear_bit(uint32_t *bitmap, int n)
 {
-  int word = n / BIT;
-  int bit = n % BIT;
+  int word = n / 32;
+  int bit = n % 32;
 
   bitmap[word] &= ~(1 << bit);
 }
 
 void set_bit(uint32_t *bitmap, int n)
 {
-  int word = n / BIT;
-  int bit = n % BIT;
+  int word = n / 32;
+  int bit = n % 32;
 
   bitmap[word] |= 1 << bit;
 }
 
 uint16_t empty_bid(uint32_t *bitmap)
 {
-  int i = 0;
-  int j = 0;
-  while (bitmap[i]) {
-    for (j = 0; j < BIT; j++) {
+  int i, j;
+  for (i = 0; i < BITMAPSIZEWORD; i++) {
+    if ((bitmap[i] == 0xFFFFFFFF))
+      continue;
+    for (j = 0; j < 32; j++) {
       if (!(bitmap[i] & (1 << j)))
-        return (i * BIT + j);
+        return (i * 32 + j);
       }
-    i++;
-    /* file system is full */
-    if (i == BITMAPSIZEWORD)
-      return 0;
   }
+  /* file system is full */
+  return 0;
+
 }
 /*--------------------------------------------------------------------------------*/
 void print_bitmap(uint32_t *bitmap, int n)
@@ -169,13 +168,15 @@ void print_bitmap(uint32_t *bitmap, int n)
 void print_block(void *disk, int bid)
 {
   int i;
-  block b = ((block *)disk)[bid];
+  uint8_t b[BLOCKSIZE];
+  
+  memcpy(b, &((uint8_t *)disk)[bid], BLOCKSIZE);
 
   printf("print_block %d", bid);
   for (i = 0; i < BLOCKSIZE; i++) {
     if (i % 16 == 0)
       printf("\n");
-    printf("%x ", b.block[i]);
+    printf("%x ", b[i]);
   }
   printf("\n");
 }
@@ -183,13 +184,13 @@ void print_block(void *disk, int bid)
 /*--------------------------------------------------------------------------------*/
 void write_block(void *disk, void *data, int bid)
 {
-  block *b = &((block *)disk)[bid];
+  uint8_t *b = &((uint8_t *)disk)[bid];
   memcpy(b, data, BLOCKSIZE);
 }
 
 void read_block(void *disk, void *data, int bid)
 {
-  block *b = &((block *)disk)[bid];
+  uint8_t *b = &((uint8_t *)disk)[bid];
   memcpy(data, b, BLOCKSIZE);
 }
 /*--------------------------------------------------------------------------------*/
@@ -203,7 +204,7 @@ int do_root(char *name, char *size)
 
   /* initialize superblock */
   disk = malloc(DISKSIZE);
-  memset(bitmap, 0, sizeof(uint32_t) * BLOCKSIZEWORD);
+  memset(bitmap, 0, sizeof(uint32_t) * BITMAPSIZEWORD);
   set_bit(bitmap, 0); /* block 0 for superblock */
 
   sb.fs_size = DISKSIZE;
@@ -225,6 +226,7 @@ int do_root(char *name, char *size)
   for (i = 0; i < 5; i++)
     write_block(disk, &bitmap[i * BLOCKSIZEWORD], i + 1);
   print_block(disk, 1);
+  print_block(disk, 2);
   write_block(disk, &root, 6);
 
   if (debug) printf("%s\n", __func__);

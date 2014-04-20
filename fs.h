@@ -28,6 +28,3 @@ typedef struct superblock {
   /* bitmap bids are 1 - 5 */
 } superblock;
 
-typedef struct block {
-  uint8_t block[1024];
-} block;
