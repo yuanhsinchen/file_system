@@ -74,7 +74,8 @@ void parse(char *buf, int *argc, char *argv[]);
 #define BLOCKSIZE 1024
 #define BLOCKSIZEWORD (1024 / 4)
 #define BLOCKNUM (DISKSIZE / BLOCKSIZE) /* how many blocks */
-#define BITMAPSIZEWORD (DISKSIZE / BLOCKSIZE / 32)
+#define BIT 32
+#define BITMAPSIZEWORD (DISKSIZE / BLOCKSIZE / BIT)
 
 /*--------------------------------------------------------------------------------*/
 
@@ -123,18 +124,34 @@ int main(int argc, char *argv[])
 /*--------------------------------------------------------------------------------*/
 void clear_bit(uint32_t *bitmap, int n)
 {
-  int word = n / 32;
-  int bit = n % 32;
+  int word = n / BIT;
+  int bit = n % BIT;
 
   bitmap[word] &= ~(1 << bit);
 }
 
 void set_bit(uint32_t *bitmap, int n)
 {
-  int word = n / 32;
-  int bit = n % 32;
+  int word = n / BIT;
+  int bit = n % BIT;
 
   bitmap[word] |= 1 << bit;
+}
+
+uint16_t empty_bid(uint32_t *bitmap)
+{
+  int i = 0;
+  int j = 0;
+  while (bitmap[i]) {
+    for (j = 0; j < BIT; j++) {
+      if (!(bitmap[i] & (1 << j)))
+        return (i * BIT + j);
+      }
+    i++;
+    /* file system is full */
+    if (i == BITMAPSIZEWORD)
+      return 0;
+  }
 }
 /*--------------------------------------------------------------------------------*/
 void print_bitmap(uint32_t *bitmap, int n)
@@ -189,17 +206,19 @@ int do_root(char *name, char *size)
   memset(bitmap, 0, sizeof(uint32_t) * BLOCKSIZEWORD);
   set_bit(bitmap, 0); /* block 0 for superblock */
 
-  /* block 1 for root directory */
-  memset(&root, 0, sizeof(dir_desc));
-  strcpy(root.dname, "root");
-  set_bit(bitmap, 6);
-
-  sb.root_bid = 6;
   sb.fs_size = DISKSIZE;
 
   /* block 1-5 for bitmap */
   for (i = 1; i <= 5; i++)
     set_bit(bitmap, i);
+
+  /* block 6 for root directory */
+  memset(&root, 0, sizeof(dir_desc));
+  strcpy(root.dname, "root");
+  set_bit(bitmap, 6);
+  root.parbid = 6;
+
+  sb.root_bid = 6;
 
   /* write descriptors to blocks*/
   write_block(disk, &sb, 0);
@@ -227,7 +246,7 @@ int do_chdir(char *name, char *size)
 int do_mkdir(char *name, char *size)
 {
   superblock *sb;
-  uint32_t bitmap[BLOCKSIZEWORD];
+  uint32_t bitmap[BITMAPSIZEWORD];
 
   if (debug) printf("%s\n", __func__);
   return 0;

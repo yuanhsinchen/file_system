@@ -16,7 +16,8 @@ struct entry {
 typedef struct dir_descriptor {
   char dname[256]; /* directory name */
   int dnum; /* how many files and directories in it? */
-  struct entry e[191]; /* entry block of the files and directories */
+  uint16_t parbid; /* parent's bid */
+  struct entry e[190]; /* entry block of the files and directories */
 } dir_desc;
     
 typedef struct superblock {
