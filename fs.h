@@ -23,8 +23,8 @@ typedef struct superblock {
 int root_bid; /* block id of root directory */
 int fs_size; /* size of the file system */
 /* 40 * 1024 blocks means 40 * 1024 bits for bitmap */
-/* 2 blocks needed */
-uint16_t bitmap_bid[2]; /* bitmap of whether a block is occupied */
+/* 5 blocks needed */
+/* bitmap bids are 1 - 5 */
 }superblock;
 
 typedef struct block {
