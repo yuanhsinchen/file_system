@@ -74,6 +74,7 @@ void parse(char *buf, int *argc, char *argv[]);
 #define BLOCKSIZE 1024
 #define BLOCKSIZEWORD (1024 / 4)
 #define BLOCKNUM (DISKSIZE / BLOCKSIZE) /* how many blocks */
+#define BITMAPSIZEWORD (DISKSIZE / BLOCKSIZE / 32)
 
 /*--------------------------------------------------------------------------------*/
 
@@ -163,23 +164,25 @@ void print_block(void *disk, int bid)
 }
 
 /*--------------------------------------------------------------------------------*/
-void write_block(void *disk, void *content, int bid)
+void write_block(void *disk, void *data, int bid)
 {
   block *b = &((block *)disk)[bid];
-  memcpy(b, content, BLOCKSIZE);
+  memcpy(b, data, BLOCKSIZE);
 }
 
-void *read_block(void *disk, int bid)
+void read_block(void *disk, void *data, int bid)
 {
-  return &((block *) disk)[bid];
+  block *b = &((block *)disk)[bid];
+  memcpy(data, b, BLOCKSIZE);
 }
 /*--------------------------------------------------------------------------------*/
 
 int do_root(char *name, char *size)
 {
   superblock sb;
-  uint32_t bitmap[BLOCKSIZEWORD];
+  uint32_t bitmap[BITMAPSIZEWORD];
   dir_desc root;
+  int i;
 
   /* initialize superblock */
   disk = malloc(DISKSIZE);
@@ -189,22 +192,21 @@ int do_root(char *name, char *size)
   /* block 1 for root directory */
   memset(&root, 0, sizeof(dir_desc));
   strcpy(root.dname, "root");
-  set_bit(bitmap, 1);
+  set_bit(bitmap, 6);
 
-  sb.root_bid = 1;
+  sb.root_bid = 6;
   sb.fs_size = DISKSIZE;
 
-  /* block 2 and 3 for bitmap */
-  set_bit(bitmap, 2);
-  sb.bitmap_bid[0] = 2;
-  set_bit(bitmap, 3);
-  sb.bitmap_bid[1] = 3;
+  /* block 1-5 for bitmap */
+  for (i = 1; i <= 5; i++)
+    set_bit(bitmap, i);
 
   /* write descriptors to blocks*/
   write_block(disk, &sb, 0);
-  write_block(disk, &root, 1);
-  write_block(disk, bitmap, 2);
-  write_block(disk, &bitmap[512], 3);
+  for (i = 0; i < 5; i++)
+    write_block(disk, &bitmap[i * BLOCKSIZEWORD], i + 1);
+  print_block(disk, 1);
+  write_block(disk, &root, 6);
 
   if (debug) printf("%s\n", __func__);
   return 0;
@@ -224,8 +226,11 @@ int do_chdir(char *name, char *size)
 
 int do_mkdir(char *name, char *size)
 {
+  superblock *sb;
+  uint32_t bitmap[BLOCKSIZEWORD];
+
   if (debug) printf("%s\n", __func__);
-  return -1;
+  return 0;
 }
 
 int do_rmdir(char *name, char *size)

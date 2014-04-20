@@ -3,7 +3,7 @@
 /* Each descriptor is 1024 Byte which is the same as block size */
 
 typedef struct file_descriptor {
-  char fname[255]; /* filename */
+  char fname[256]; /* filename */
   int fsize; /* file size */
   uint16_t bid[382]; /* block id of the file */
 } file_desc;
@@ -14,7 +14,7 @@ struct entry {
 };
 
 typedef struct dir_descriptor {
-  char dname[255]; /* directory name */
+  char dname[256]; /* directory name */
   int dnum; /* how many files and directories in it? */
   struct entry e[191]; /* entry block of the files and directories */
 } dir_desc;
