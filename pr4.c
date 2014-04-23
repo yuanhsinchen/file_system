@@ -182,13 +182,13 @@ void print_block(void *disk, int bid)
 }
 
 /*--------------------------------------------------------------------------------*/
-void write_block(void *disk, void *data, int bid)
+void write_block(void *data, int bid)
 {
   uint8_t *b = &((uint8_t *)disk)[bid];
   memcpy(b, data, BLOCKSIZE);
 }
 
-void read_block(void *disk, void *data, int bid)
+void read_block(void *data, int bid)
 {
   uint8_t *b = &((uint8_t *)disk)[bid];
   memcpy(data, b, BLOCKSIZE);
@@ -222,12 +222,12 @@ int do_root(char *name, char *size)
   sb.root_bid = 6;
 
   /* write descriptors to blocks*/
-  write_block(disk, &sb, 0);
+  write_block(&sb, 0);
   for (i = 0; i < 5; i++)
-    write_block(disk, &bitmap[i * BLOCKSIZEWORD], i + 1);
+    write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
   print_block(disk, 1);
   print_block(disk, 2);
-  write_block(disk, &root, 6);
+  write_block(&root, 6);
 
   if (debug) printf("%s\n", __func__);
   return 0;
