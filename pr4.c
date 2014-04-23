@@ -170,7 +170,7 @@ void print_block(void *disk, int bid)
   int i;
   uint8_t b[BLOCKSIZE];
   
-  memcpy(b, &((uint8_t *)disk)[bid], BLOCKSIZE);
+  memcpy(b, &((uint8_t *)disk)[bid * BLOCKSIZE], BLOCKSIZE);
 
   printf("print_block %d", bid);
   for (i = 0; i < BLOCKSIZE; i++) {
@@ -184,13 +184,13 @@ void print_block(void *disk, int bid)
 /*--------------------------------------------------------------------------------*/
 void write_block(void *data, int bid)
 {
-  uint8_t *b = &((uint8_t *)disk)[bid];
+  uint8_t *b = &((uint8_t *)disk)[bid * BLOCKSIZE];
   memcpy(b, data, BLOCKSIZE);
 }
 
 void read_block(void *data, int bid)
 {
-  uint8_t *b = &((uint8_t *)disk)[bid];
+  uint8_t *b = &((uint8_t *)disk)[bid * BLOCKSIZE];
   memcpy(data, b, BLOCKSIZE);
 }
 /*--------------------------------------------------------------------------------*/
@@ -204,6 +204,10 @@ int do_root(char *name, char *size)
 
   /* initialize superblock */
   disk = malloc(DISKSIZE);
+  if (disk==NULL) {
+    printf("disk allocation failed\n");
+    exit (1);
+  }
   memset(bitmap, 0, sizeof(uint32_t) * BITMAPSIZEWORD);
   set_bit(bitmap, 0); /* block 0 for superblock */
 
@@ -226,7 +230,6 @@ int do_root(char *name, char *size)
   for (i = 0; i < 5; i++)
     write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
   print_block(disk, 1);
-  print_block(disk, 2);
   write_block(&root, 6);
 
   if (debug) printf("%s\n", __func__);
@@ -235,8 +238,14 @@ int do_root(char *name, char *size)
 
 int do_print(char *name, char *size)
 {
+  superblock sb;
+  dir_desc root;
+
+  read_block(&sb, 0);
+  read_block(&root, sb.root_bid);
+  
   if (debug) printf("%s\n", __func__);
-  return -1;
+  return 0;
 }
 
 int do_chdir(char *name, char *size)
