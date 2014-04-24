@@ -307,6 +307,7 @@ int do_mkfil(char *name, char *size) {
     uint32_t bitmap[BITMAPSIZEWORD];
     uint16_t empty_block = 0;
     int i;
+    dir_desc current_dir;
     
     /*
      find empty block
@@ -333,6 +334,13 @@ int do_mkfil(char *name, char *size) {
     
     write_block(&new_file_desc, empty_block);
     write_block(bitmap, i);
+
+    read_block(&current_dir, cwd); //read current_dir
+    update_parent(&current_dir, 0, empty_block); //update parent
+    current_dir.dnum++;
+    //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
+    write_block(&current_dir, cwd);
+    //write back to block
     
     if (debug) printf("%s\n", __func__);
     return 0;
