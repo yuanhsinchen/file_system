@@ -83,23 +83,23 @@ int main(int argc, char *argv[]) {
     char in[LINESIZE];
     char *cmd, *fnm, *fsz;
     char dummy[] = "";
-
+    
     int n;
     char *a[LINESIZE];
-
+    
     while (fgets(in, LINESIZE, stdin) != NULL) {
         // commands are all like "cmd filename filesize\n" with whitespace between
-
+        
         // parse in
         parse(in, &n, a);
-
+        
         cmd = (n > 0) ? a[0] : dummy;
         fnm = (n > 1) ? a[1] : dummy;
         fsz = (n > 2) ? a[2] : dummy;
         if (debug) printf(":%s:%s:%s:\n", cmd, fnm, fsz);
-
+        
         if (n == 0) continue; // blank line
-
+        
         int found = 0;
         for (struct action *ptr = table; ptr->cmd != NULL; ptr++) {
             if (strcmp(ptr->cmd, cmd) == 0) {
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
             printf("command not found: %s\n", cmd);
         }
     }
-
+    
     return 0;
 }
 
@@ -123,14 +123,14 @@ int main(int argc, char *argv[]) {
 void clear_bit(uint32_t *bitmap, int n) {
     int word = n / 32;
     int bit = n % 32;
-
+    
     bitmap[word] &= ~(1 << bit);
 }
 
 void set_bit(uint32_t *bitmap, int n) {
     int word = n / 32;
     int bit = n % 32;
-
+    
     bitmap[word] |= 1 << bit;
 }
 
@@ -146,7 +146,7 @@ uint16_t empty_bid(uint32_t *bitmap) {
     }
     /* file system is full */
     return 0;
-
+    
 }
 /*--------------------------------------------------------------------------------*/
 void print_bitmap(uint32_t *bitmap, int n) {
@@ -163,9 +163,9 @@ void print_bitmap(uint32_t *bitmap, int n) {
 void print_block(void *disk, int bid) {
     int i;
     uint8_t b[BLOCKSIZE];
-
+    
     memcpy(b, &((uint8_t *)disk)[bid * BLOCKSIZE], BLOCKSIZE);
-
+    
     printf("print_block %d", bid);
     for (i = 0; i < BLOCKSIZE; i++) {
         if (i % 16 == 0)
@@ -185,6 +185,18 @@ void read_block(void *data, int bid) {
     uint8_t *b = &((uint8_t *)disk)[bid * BLOCKSIZE];
     memcpy(data, b, BLOCKSIZE);
 }
+
+void update_parent(dir_desc *update, int file_or_dir, int bid) {
+    for (int i = 0; i < 190; i++) {
+        if (update->e[i].bid == 0) {
+            update->e[i].bid = bid;
+            update->e[i].type = file_or_dir;
+            return;
+        }
+    }
+    
+    fprintf(stderr, "ERROR: NOT ENOUGH SPACE IN DIRECTORY");
+}
 /*--------------------------------------------------------------------------------*/
 
 int do_root(char *name, char *size) {
@@ -193,7 +205,7 @@ int do_root(char *name, char *size) {
     uint32_t bitmap[BITMAPSIZEWORD];
     dir_desc root;
     int i;
-
+    
     /* initialize superblock */
     disk = malloc(DISKSIZE);
     if (disk == NULL) {
@@ -202,28 +214,28 @@ int do_root(char *name, char *size) {
     }
     memset(bitmap, 0, sizeof(uint32_t) * BITMAPSIZEWORD);
     set_bit(bitmap, 0); /* block 0 for superblock */
-
+    
     sb.fs_size = DISKSIZE;
-
+    
     /* block 1-5 for bitmap */
     for (i = 1; i <= 5; i++)
         set_bit(bitmap, i);
-
+    
     /* block 6 for root directory */
     memset(&root, 0, sizeof(dir_desc));
     strcpy(root.dname, "root");
     set_bit(bitmap, 6);
     root.parbid = 6;
-
+    
     sb.root_bid = 6;
-
+    
     /* write descriptors to blocks*/
     write_block(&sb, 0);
     for (i = 0; i < 5; i++)
         write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
     //print_block(disk, 1);
     write_block(&root, 6);
-
+    
     if (debug) printf("%s\n", __func__);
     return 0;
 }
@@ -231,10 +243,10 @@ int do_root(char *name, char *size) {
 int do_print(char *name, char *size) {
     superblock sb;
     dir_desc root;
-
+    
     read_block(&sb, 0);
     read_block(&root, sb.root_bid);
-
+    
     if (debug) printf("%s\n", __func__);
     return 0;
 }
@@ -249,35 +261,32 @@ int do_mkdir(char *name, char *size) {
     uint32_t bitmap[BITMAPSIZEWORD];
     int empty_block = 0;
     int i;
-
-    /*
-    find empty block
-    change bitmap to 1
-    make new dir_desc
-    initialize it
-    memcpy into block
-    update parent
-    sync parent dir into block
-    */
-
+    dir_desc current_dir;
+    
+    //find an open block
     for (i = 1; i <= 5; i++) {
         read_block(bitmap, i);
         empty_block = empty_bid(bitmap);
-        if (empty_block != 0)
+        if (empty_block != 0) //if empty block is found, break
             break;
     }
-
-    set_bit(bitmap, empty_block);
-
-    print_bitmap(bitmap, 20);
-    dir_desc new_dir_desc;
-    strcpy(new_dir_desc.dname, name);
-    new_dir_desc.dnum = 0;
-    new_dir_desc.parbid = cwd;
-
-    write_block(&new_dir_desc, empty_block);
-    write_block(bitmap, i);
-
+    
+    set_bit(bitmap, empty_block); //set bit in bitmap to 1
+    dir_desc new_dir_desc; //new dir_desc
+    strcpy(new_dir_desc.dname, name); //set dir_desc name
+    new_dir_desc.dnum = 0; //set number of directories/files
+    new_dir_desc.parbid = cwd; //set parent bid
+    
+    write_block(&new_dir_desc, empty_block); //write new dir_desc to empty block
+    write_block(bitmap, i); //write updated bitmap to bitmap block
+    
+    read_block(&current_dir, cwd); //read current_dir
+    update_parent(&current_dir, 0, empty_block); //update parent
+    current_dir.dnum++;
+    //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
+    write_block(&current_dir, cwd);
+    //write back to block
+    
     if (debug) printf("%s\n", __func__);
     return 0;
 }
@@ -298,33 +307,33 @@ int do_mkfil(char *name, char *size) {
     uint32_t bitmap[BITMAPSIZEWORD];
     uint16_t empty_block = 0;
     int i;
-
+    
     /*
-    find empty block
-    change bitmap to 1
-    make new file_desc
-    initialize it
-    memcpy into block
-    */
-
+     find empty block
+     change bitmap to 1
+     make new file_desc
+     initialize it
+     memcpy into block
+     */
+    
     for (i = 1; i <= 5; i++) {
         read_block(bitmap, i);
         empty_block = empty_bid(bitmap);
         if (empty_block != 0)
             break;
     }
-
+    
     set_bit(bitmap, empty_block);
-
+    
     print_bitmap(bitmap, 20);
     file_desc new_file_desc;
     strcpy(new_file_desc.fname, name);
-    new_file_desc.fsize = size;   
-    new_file_desc.bid[0] = empty_block; 
-
+    new_file_desc.fsize = size;
+    new_file_desc.bid[0] = empty_block;
+    
     write_block(&new_file_desc, empty_block);
     write_block(bitmap, i);
-
+    
     if (debug) printf("%s\n", __func__);
     return 0;
 }
@@ -360,9 +369,9 @@ int do_exit(char *name, char *size) {
 void parse(char *buf, int *argc, char *argv[]) {
     char *delim;          // points to first space delimiter
     int count = 0;        // number of args
-
+    
     char whsp[] = " \t\n\v\f\r";          // whitespace characters
-
+    
     while (1) {                           // build the argv list
         buf += strspn(buf, whsp);         // skip leading whitespace
         delim = strpbrk(buf, whsp);       // next whitespace char or NULL
@@ -374,9 +383,9 @@ void parse(char *buf, int *argc, char *argv[]) {
         buf = delim + 1;                  // start argv[i+1]?
     }
     argv[count] = NULL;
-
+    
     *argc = count;
-
+    
     return;
 }
 
