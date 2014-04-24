@@ -292,8 +292,49 @@ int do_mkdir(char *name, char *size) {
 }
 
 int do_rmdir(char *name, char *size) {
+    
+    uint32_t bitmap[BITMAPSIZEWORD];
+    dir_desc cwdb, todb;
+    read_block( &cwdb, cwd);
+    for (int i = 0; i < 5; i++) {
+      read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+    }
+    if (!strcmp(name, "..")) {
+      cwd = cwdb.parbid;
+      read_block( &cwdb, cwd);
+    }
+    else {
+      int find_dir = 0;
+      for (int i = 0; i < 190; i++){
+        if (cwdb.e[i].bid > 0) {
+          int t_a = cwdb.e[i].bid / 32;
+          int t_b = cwdb.e[i].bid % 32;
+          if ((bitmap[t_a] & (1 << t_b))) {
+//            printf("block %d is under this directory \n", cwdb.e[i].bid);
+            if (cwdb.e[i].type == 0) {
+              read_block( &todb, cwdb.e[i].bid);
+//              printf("it is a directory (%s)\n", todb.dname);
+              if (!strcmp(todb.dname, name)) {
+                find_dir = 1;
+                cwd = cwdb.e[i].bid;
+                read_block( &cwdb, cwd);
+              }
+            }
+          }
+        }
+      }
+      if (find_dir == 0) {
+        printf("Directory '%s' not found.\n", name);
+      }
+    }
+    printf("\n%s\\>", cwdb.dname);
+    
+//    printf("CD %d = (%d, %d)\n", to_dir, to_dir_block, to_dir_bit);
+    
     if (debug) printf("%s\n", __func__);
-    return -1;
+    return 0;
+
+
 }
 
 int do_mvdir(char *name, char *size) {
