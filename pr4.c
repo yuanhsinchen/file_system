@@ -252,46 +252,6 @@ int do_print(char *name, char *size) {
 }
 
 int do_chdir(char *name, char *size) {
-    if (debug) printf("%s\n", __func__);
-    return -1;
-}
-
-int do_mkdir(char *name, char *size) {
-    superblock *sb;
-    uint32_t bitmap[BITMAPSIZEWORD];
-    int empty_block = 0;
-    int i;
-    dir_desc current_dir;
-    
-    //find an open block
-    for (i = 1; i <= 5; i++) {
-        read_block(bitmap, i);
-        empty_block = empty_bid(bitmap);
-        if (empty_block != 0) //if empty block is found, break
-            break;
-    }
-    
-    set_bit(bitmap, empty_block); //set bit in bitmap to 1
-    dir_desc new_dir_desc; //new dir_desc
-    strcpy(new_dir_desc.dname, name); //set dir_desc name
-    new_dir_desc.dnum = 0; //set number of directories/files
-    new_dir_desc.parbid = cwd; //set parent bid
-    
-    write_block(&new_dir_desc, empty_block); //write new dir_desc to empty block
-    write_block(bitmap, i); //write updated bitmap to bitmap block
-    
-    read_block(&current_dir, cwd); //read current_dir
-    update_parent(&current_dir, 0, empty_block); //update parent
-    current_dir.dnum++;
-    //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
-    write_block(&current_dir, cwd);
-    //write back to block
-    
-    if (debug) printf("%s\n", __func__);
-    return 0;
-}
-
-int do_rmdir(char *name, char *size) {
     
     uint32_t bitmap[BITMAPSIZEWORD];
     dir_desc cwdb, todb;
@@ -334,7 +294,47 @@ int do_rmdir(char *name, char *size) {
     if (debug) printf("%s\n", __func__);
     return 0;
 
+}
 
+int do_mkdir(char *name, char *size) {
+    superblock *sb;
+    uint32_t bitmap[BITMAPSIZEWORD];
+    int empty_block = 0;
+    int i;
+    dir_desc current_dir;
+    
+    //find an open block
+    for (i = 1; i <= 5; i++) {
+        read_block(bitmap, i);
+        empty_block = empty_bid(bitmap);
+        if (empty_block != 0) //if empty block is found, break
+            break;
+    }
+    
+    set_bit(bitmap, empty_block); //set bit in bitmap to 1
+    dir_desc new_dir_desc; //new dir_desc
+    strcpy(new_dir_desc.dname, name); //set dir_desc name
+    new_dir_desc.dnum = 0; //set number of directories/files
+    new_dir_desc.parbid = cwd; //set parent bid
+    
+    write_block(&new_dir_desc, empty_block); //write new dir_desc to empty block
+    write_block(bitmap, i); //write updated bitmap to bitmap block
+    
+    read_block(&current_dir, cwd); //read current_dir
+    update_parent(&current_dir, 0, empty_block); //update parent
+    current_dir.dnum++;
+    //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
+    write_block(&current_dir, cwd);
+    //write back to block
+    
+    if (debug) printf("%s\n", __func__);
+    return 0;
+}
+
+int do_rmdir(char *name, char *size) {
+
+    if (debug) printf("%s\n", __func__);
+    return -1;
 }
 
 int do_mvdir(char *name, char *size) {
