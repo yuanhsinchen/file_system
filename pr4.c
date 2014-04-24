@@ -309,6 +309,7 @@ int do_mkfil(char *name, char *size) {
     dir_desc current_dir;
     int file_size = atoi(size);
     int number_of_blocks;
+    file_desc new_file_desc;
 
     int i;
     int j;
@@ -322,7 +323,8 @@ int do_mkfil(char *name, char *size) {
 
     number_of_blocks = 1 + ((file_size - 1) / BLOCKSIZE);
 
-    printf("%i", number_of_blocks);
+    strcpy(new_file_desc.fname, name);
+    new_file_desc.fsize = file_size;
 
     for(i =0; i < number_of_blocks; i++) {
     
@@ -336,21 +338,17 @@ int do_mkfil(char *name, char *size) {
         set_bit(bitmap, empty_block);
         
         print_bitmap(bitmap, 20);
-        file_desc new_file_desc;
-        strcpy(new_file_desc.fname, name);
-        new_file_desc.fsize = file_size;
         new_file_desc.bid[i] = empty_block;
         
         write_block(&new_file_desc, empty_block);
         write_block(bitmap, j);
-
-        read_block(&current_dir, cwd); //read current_dir
-        update_parent(&current_dir, 0, empty_block); //update parent
-        current_dir.dnum++;
-        //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
-        write_block(&current_dir, cwd);
-        //write back to block
     }
+
+    read_block(&current_dir, cwd); //read current_dir
+    update_parent(&current_dir, 1, empty_block);    //update parent
+    current_dir.dnum++;
+    //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
+    write_block(&current_dir, cwd);
         
     if (debug) printf("%s\n", __func__);
     return 0;
