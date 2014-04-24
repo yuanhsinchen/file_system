@@ -292,9 +292,41 @@ int do_mvdir(char *name, char *size) {
     return -1;
 }
 
+// TODO: check file size, if file is bigger than block store it on multiple blocks
 int do_mkfil(char *name, char *size) {
+    superblock *sb;
+    uint32_t bitmap[BITMAPSIZEWORD];
+    uint16_t empty_block = 0;
+    int i;
+
+    /*
+    find empty block
+    change bitmap to 1
+    make new file_desc
+    initialize it
+    memcpy into block
+    */
+
+    for (i = 1; i <= 5; i++) {
+        read_block(bitmap, i);
+        empty_block = empty_bid(bitmap);
+        if (empty_block != 0)
+            break;
+    }
+
+    set_bit(bitmap, empty_block);
+
+    print_bitmap(bitmap, 20);
+    file_desc new_file_desc;
+    strcpy(new_file_desc.fname, name);
+    new_file_desc.fsize = size;   
+    new_file_desc.bid[0] = empty_block; 
+
+    write_block(&new_file_desc, empty_block);
+    write_block(bitmap, i);
+
     if (debug) printf("%s\n", __func__);
-    return -1;
+    return 0;
 }
 
 int do_rmfil(char *name, char *size) {
