@@ -415,6 +415,8 @@ int do_mkdir(char *name, char *size) {
     //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
     write_block(&current_dir, cwd); //write back to block
     
+    ls(current_dir);
+
     printf("\n%s\\>", current_dir.dname);
 
     if (debug) printf("%s\n", __func__);
@@ -520,7 +522,7 @@ int do_mkfil(char *name, char *size) {
 
         if(k-1 == number_of_blocks){
             write_block(bitmap, j);
-            print_bitmap(bitmap, 20);
+            //print_bitmap(bitmap, 20);
             break;
         }
     }
@@ -530,6 +532,7 @@ int do_mkfil(char *name, char *size) {
     current_dir.dnum++;
     //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
     write_block(&current_dir, cwd);
+    ls(current_dir);
     printf("\n%s\\>", current_dir.dname);
 
     if (debug) printf("%s\n", __func__);
