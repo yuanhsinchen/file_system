@@ -242,6 +242,46 @@ int parse_char_to_int(char *number){
     
     return int_size;
 }
+
+int ls(dir_desc dir)
+{
+  int dnum = dir.dnum;
+  int i = 0;
+  file_desc f;
+  dir_desc d;
+
+  printf("--------\n");
+  while (dnum) {
+    if (dir.e[i].bid) {
+      if (dir.e[i].type){
+        read_block(&f, dir.e[i].bid);
+        printf("%s\n", f.fname);
+      } else {
+        read_block(&d, dir.e[i].bid);
+        printf("%s\/\n", d.dname);
+      }
+      dnum--;
+    }
+    i++;
+  }
+  printf("\n");
+}
+
+void dfs(uint16_t bid)
+{
+  int i;
+  dir_desc d;
+
+  read_block(&d, bid);
+  printf("%s: \n", d.dname);
+  ls(d);
+  for (i = 0; i <  190; i++) {
+    if ((d.e[i].bid) && (!d.e[i].type)) {
+      dfs(d.e[i].bid);
+    }
+  }
+}
+
 /*--------------------------------------------------------------------------------*/
 
 int do_root(char *name, char *size) {
@@ -280,57 +320,21 @@ int do_root(char *name, char *size) {
         write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
     //print_block(disk, 1);
     write_block(&root, 6);
-    
+
+    printf("\n%s\\>", root.dname);
+
     if (debug) printf("%s\n", __func__);
     return 0;
 }
 
-int ls(dir_desc dir)
-{
-  int dnum = dir.dnum;
-  int i = 0;
-  file_desc f;
-  dir_desc d;
-
-  while (dnum) {
-    if (dir.e[i].bid) {
-      if (dir.e[i].type){
-        read_block(&f, dir.e[i].bid);
-        printf("%s\n", f.fname);
-      } else {
-        read_block(&d, dir.e[i].bid);
-        printf("%s\n", d.dname);
-      }
-      dnum--;
-    }
-    i++;
-  }
-}
-
-void dfs(uint16_t bid)
-{
-  int i;
-  dir_desc d;
-
-  read_block(&d, bid);
-  ls(d);
-  for (i = 0; i <  190; i++) {
-    if ((d.e[i].bid) && (!d.e[i].type)) {
-      dfs(d.e[i].bid);
-    }
-  }
-}
-
 int do_print(char *name, char *size)
 {
-  superblock sb;
-  dir_desc root;
+  dir_desc cwdd;
 
-  read_block(&sb, 0);
-  read_block(&root, sb.root_bid);
-
+  read_block(&cwdd, cwd);
   dfs(cwd);
 
+  printf("\n%s\\>", cwdd.dname);
   if (debug) printf("%s\n", __func__);
   return 0;
 }
@@ -397,6 +401,7 @@ int do_mkdir(char *name, char *size) {
     
     set_bit(bitmap, empty_block); //set bit in bitmap to 1
     dir_desc new_dir_desc; //new dir_desc
+    memset(&new_dir_desc, 0, sizeof(dir_desc));
     strcpy(new_dir_desc.dname, name); //set dir_desc name
     new_dir_desc.dnum = 0; //set number of directories/files
     new_dir_desc.parbid = cwd; //set parent bid
@@ -410,7 +415,8 @@ int do_mkdir(char *name, char *size) {
     //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
     write_block(&current_dir, cwd); //write back to block
     
-    
+    printf("\n%s\\>", current_dir.dname);
+
     if (debug) printf("%s\n", __func__);
     return 0;
 }
@@ -484,6 +490,7 @@ int do_mkfil(char *name, char *size) {
         file_size = 0;
     number_of_blocks = 1 + ((file_size - 1) / BLOCKSIZE);
     
+    memset(&new_file_desc, 0, sizeof(file_desc));
     strcpy(new_file_desc.fname, name);
     new_file_desc.fsize = file_size;
     memset(new_file_desc.bid, 0, 381);
@@ -523,7 +530,8 @@ int do_mkfil(char *name, char *size) {
     current_dir.dnum++;
     //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
     write_block(&current_dir, cwd);
-        
+    printf("\n%s\\>", current_dir.dname);
+
     if (debug) printf("%s\n", __func__);
     return 0;
 }
