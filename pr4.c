@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <math.h>
 #include "fs.h"
 
 /*--------------------------------------------------------------------------------*/
@@ -195,7 +196,51 @@ void update_parent(dir_desc *update, int file_or_dir, int bid) {
         }
     }
     
-    fprintf(stderr, "ERROR: NOT ENOUGH SPACE IN DIRECTORY");
+    fprintf(stderr, "ERROR: NOT ENOUGH SPACE IN DIRECTORY\n");
+}
+
+void add_block(file_desc *file, int bid){
+    for(int i=0; i<382; i++){
+        if(file->bid[i] == 0) {
+            file->bid[i] = bid;
+            printf ("wrote %d to file[%d]\n", bid, i);
+            return;
+        }
+    }
+    
+    fprintf(stderr, "ERROR: %s TOO LARGE", file->fname);
+}
+
+//the next two functions are wholly unncessary but i wrote both of them
+//before i found the function atoi() so i'm keeping them out of spite.
+int exp10(int pow){
+    int value=10;
+    if(pow == 0)
+        return 1;
+    else{
+        
+        for(int i=1; i < pow; i++){
+            value *= 10;
+        }
+    }
+    
+    return value;
+}
+
+int parse_char_to_int(char *number){
+    int int_size=0;
+    int count=0;
+    for(int i=0; number[i] != '\0'; i++){
+        count++;
+    }
+    
+    int digit = count-1;
+    for(int j=0; j<count; j++){
+        int_size += (number[j]-'0')*exp10(digit);
+        digit--;
+    }
+    
+    return int_size;
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -284,8 +329,8 @@ int do_mkdir(char *name, char *size) {
     update_parent(&current_dir, 0, empty_block); //update parent
     current_dir.dnum++;
     //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
-    write_block(&current_dir, cwd);
-    //write back to block
+    write_block(&current_dir, cwd); //write back to block
+    
     
     if (debug) printf("%s\n", __func__);
     return 0;
@@ -309,10 +354,12 @@ int do_mkfil(char *name, char *size) {
     dir_desc current_dir;
     int file_size = atoi(size);
     int number_of_blocks;
+    int file_desc_block;
     file_desc new_file_desc;
 
-    int i;
+    int k=1;
     int j;
+    int i;
     /*
      find empty block
      change bitmap to 1
@@ -321,31 +368,48 @@ int do_mkfil(char *name, char *size) {
      memcpy into block
      */
 
-    number_of_blocks = 1 + ((file_size - 1) / BLOCKSIZE);
-
+    
+    
+    if(size[0] == '\0')
+        file_size = 0;
+    number_of_blocks = ceil(file_size/BLOCKSIZE) + 1;
+    
     strcpy(new_file_desc.fname, name);
     new_file_desc.fsize = file_size;
-
-    for(i =0; i < number_of_blocks; i++) {
+    memset(new_file_desc.bid, 0, 381);
     
-        for (j = 1; j <= 5; j++) {
-            read_block(bitmap, j);
-            empty_block = empty_bid(bitmap);
-            if (empty_block != 0)
-                break;
+    for (i = 1; i <= 5; i++) {
+        read_block(bitmap, i);
+        file_desc_block = empty_bid(bitmap);
+        if (file_desc_block != 0){
+            write_block(&new_file_desc, file_desc_block);
+            set_bit(bitmap, file_desc_block);
+            write_block(bitmap, i);
+            break;
         }
-        
-        set_bit(bitmap, empty_block);
-        
-        print_bitmap(bitmap, 20);
-        new_file_desc.bid[i] = empty_block;
-        
-        write_block(&new_file_desc, empty_block);
-        write_block(bitmap, j);
     }
+    
+    
+    for (j = i; j <= 5; j++) {
+        read_block(bitmap, j);
+        while(k <= number_of_blocks && k < BITMAPSIZEWORD) {
+            empty_block = empty_bid(bitmap);
+            if (empty_block != 0){
+                set_bit(bitmap, empty_block);
+                add_block(&new_file_desc, empty_block);
+                k++;
+            }
+        }
 
+        if(k-1 == number_of_blocks){
+            write_block(bitmap, j);
+            print_bitmap(bitmap, 20);
+            break;
+        }
+    }
+    
     read_block(&current_dir, cwd); //read current_dir
-    update_parent(&current_dir, 1, empty_block);    //update parent
+    update_parent(&current_dir, 1, file_desc_block);    //update parent
     current_dir.dnum++;
     //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
     write_block(&current_dir, cwd);
@@ -364,9 +428,68 @@ int do_mvfil(char *name, char *size) {
     return -1;
 }
 
-int do_szfil(char *name, char *size) {
+int do_szfil(char *name, char *size) { //christina
+    
+    /* find file
+     calculate blocks needed/not needed
+     change block bitmap
+     update file descriptor
+     SZFIL ONLY WORKS ON FILES IN CURRENT DIRECTORY
+     */
+    
+    dir_desc current_dir;
+    file_desc temp_block_id;
+    
+    
+    //parse size into int
+    int size_of_file = atoi(size);
+    int found=0;
+    
+    //read files from directory
+    read_block(&current_dir, cwd);
+    for(int i=0; i < 190; i++){
+        if(current_dir.e[i].type == 1){
+            read_block(&temp_block_id, current_dir.e[i].bid);
+            if(strcmp(temp_block_id.fname, name) == 0) {
+                found=1;
+                break;
+            }
+        }
+    }
+    if (found == 0) {
+        printf("%s was not found\n", name);
+        return -1;
+    }
+    
+    //calculate number of blocks needed
+    int num_of_blocks = ceil(size_of_file/BLOCKSIZE)+1;
+    int k=1;
+    uint32_t bitmap[BITMAPSIZEWORD];
+    uint16_t empty_block = 0;
+    
+    for(int i=0; i < 382; i++){
+        printf("%d ", temp_block_id.bid[i]);
+    }
+    
+    for (int j = 1; j <= 5; j++) {
+        read_block(bitmap, j);
+        while(k <= num_of_blocks && k < BITMAPSIZEWORD) {
+            empty_block = empty_bid(bitmap);
+            if (empty_block != 0){
+                set_bit(bitmap, empty_block);
+                //print_bitmap(bitmap, 20);
+                add_block(&temp_block_id, empty_block);
+                k++;
+            }
+        }
+        if(k == num_of_blocks){
+            break;
+            write_block(bitmap, j);
+        }
+    }
+    
     if (debug) printf("%s\n", __func__);
-    return -1;
+    return 0;
 }
 
 int do_exit(char *name, char *size) {
