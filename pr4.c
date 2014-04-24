@@ -285,15 +285,54 @@ int do_root(char *name, char *size) {
     return 0;
 }
 
-int do_print(char *name, char *size) {
-    superblock sb;
-    dir_desc root;
-    
-    read_block(&sb, 0);
-    read_block(&root, sb.root_bid);
-    
-    if (debug) printf("%s\n", __func__);
-    return 0;
+int ls(dir_desc dir)
+{
+  int dnum = dir.dnum;
+  int i = 0;
+  file_desc f;
+  dir_desc d;
+
+  while (dnum) {
+    if (dir.e[i].bid) {
+      if (dir.e[i].type){
+        read_block(&f, dir.e[i].bid);
+        printf("%s\n", f.fname);
+      } else {
+        read_block(&d, dir.e[i].bid);
+        printf("%s\n", d.dname);
+      }
+      dnum--;
+    }
+    i++;
+  }
+}
+
+void dfs(uint16_t bid)
+{
+  int i;
+  dir_desc d;
+
+  read_block(&d, bid);
+  ls(d);
+  for (i = 0; i <  190; i++) {
+    if ((d.e[i].bid) && (!d.e[i].type)) {
+      dfs(d.e[i].bid);
+    }
+  }
+}
+
+int do_print(char *name, char *size)
+{
+  superblock sb;
+  dir_desc root;
+
+  read_block(&sb, 0);
+  read_block(&root, sb.root_bid);
+
+  dfs(cwd);
+
+  if (debug) printf("%s\n", __func__);
+  return 0;
 }
 
 int do_chdir(char *name, char *size) {
