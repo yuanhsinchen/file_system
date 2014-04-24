@@ -306,9 +306,12 @@ int do_mkfil(char *name, char *size) {
     superblock *sb;
     uint32_t bitmap[BITMAPSIZEWORD];
     uint16_t empty_block = 0;
-    int i;
     dir_desc current_dir;
-    
+    int file_size = atoi(size);
+    int number_of_blocks;
+
+    int i;
+    int j;
     /*
      find empty block
      change bitmap to 1
@@ -316,32 +319,39 @@ int do_mkfil(char *name, char *size) {
      initialize it
      memcpy into block
      */
-    
-    for (i = 1; i <= 5; i++) {
-        read_block(bitmap, i);
-        empty_block = empty_bid(bitmap);
-        if (empty_block != 0)
-            break;
-    }
-    
-    set_bit(bitmap, empty_block);
-    
-    print_bitmap(bitmap, 20);
-    file_desc new_file_desc;
-    strcpy(new_file_desc.fname, name);
-    new_file_desc.fsize = size;
-    new_file_desc.bid[0] = empty_block;
-    
-    write_block(&new_file_desc, empty_block);
-    write_block(bitmap, i);
 
-    read_block(&current_dir, cwd); //read current_dir
-    update_parent(&current_dir, 0, empty_block); //update parent
-    current_dir.dnum++;
-    //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
-    write_block(&current_dir, cwd);
-    //write back to block
+    number_of_blocks = 1 + ((file_size - 1) / BLOCKSIZE);
+
+    printf("%i", number_of_blocks);
+
+    for(i =0; i < number_of_blocks; i++) {
     
+        for (j = 1; j <= 5; j++) {
+            read_block(bitmap, j);
+            empty_block = empty_bid(bitmap);
+            if (empty_block != 0)
+                break;
+        }
+        
+        set_bit(bitmap, empty_block);
+        
+        print_bitmap(bitmap, 20);
+        file_desc new_file_desc;
+        strcpy(new_file_desc.fname, name);
+        new_file_desc.fsize = file_size;
+        new_file_desc.bid[i] = empty_block;
+        
+        write_block(&new_file_desc, empty_block);
+        write_block(bitmap, j);
+
+        read_block(&current_dir, cwd); //read current_dir
+        update_parent(&current_dir, 0, empty_block); //update parent
+        current_dir.dnum++;
+        //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
+        write_block(&current_dir, cwd);
+        //write back to block
+    }
+        
     if (debug) printf("%s\n", __func__);
     return 0;
 }
