@@ -401,19 +401,10 @@ int do_mkfil(char *name, char *size) {
     int k=1;
     int j;
     int i;
-    /*
-     find empty block
-     change bitmap to 1
-     make new file_desc
-     initialize it
-     memcpy into block
-     */
 
-    
-    
     if(size[0] == '\0')
         file_size = 0;
-    number_of_blocks = ceil(file_size/BLOCKSIZE) + 1;
+    number_of_blocks = 1 + ((file_size - 1) / BLOCKSIZE);
     
     strcpy(new_file_desc.fname, name);
     new_file_desc.fsize = file_size;
@@ -503,7 +494,7 @@ int do_szfil(char *name, char *size) { //christina
     }
     
     //calculate number of blocks needed
-    int num_of_blocks = ceil(size_of_file/BLOCKSIZE)+1;
+    int num_of_blocks = 1 + ((size_of_file - 1) / BLOCKSIZE);
     int k=1;
     uint32_t bitmap[BITMAPSIZEWORD];
     uint16_t empty_block = 0;
