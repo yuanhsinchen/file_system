@@ -222,18 +222,16 @@ int ls(dir_desc dir)
     dir_desc d;
     
     printf("--------\n");
-    while (dnum) {
+    for (i = 0; i < 190; i++) {
         if (dir.e[i].bid) {
             if (dir.e[i].type){
                 read_block(&f, dir.e[i].bid);
-                printf("%s\n", f.fname);
+                printf("%s      %d Byte\n", f.fname, f.fsize);
             } else {
                 read_block(&d, dir.e[i].bid);
-                printf("%s\/\n", d.dname);
+                printf("%s      %d\n", d.dname, d.dnum);
             }
-            dnum--;
         }
-        i++;
     }
     printf("\n");
 }
@@ -248,6 +246,7 @@ void dfs(uint16_t bid)
     ls(d);
     for (i = 0; i <  190; i++) {
         if ((d.e[i].bid) && (!d.e[i].type)) {
+            printf("bid %d\n", d.e[i].bid);
             dfs(d.e[i].bid);
         }
     }
@@ -291,8 +290,7 @@ int do_root(char *name, char *size) {
     //print_block(disk, 1);
     write_block(&root, 6);
     
-    if(debug)
-        printf("\n%s\\>", root.dname);
+    printf("\n%s\\>", root.dname);
     
     if (debug) printf("%s\n", __func__);
     return 0;
@@ -440,11 +438,12 @@ int do_rmdir(char *name, char *size) {
     }
 
     write_block( &cwdb, cwd);
-    
+    ls(cwdb); 
 //    for (int i=0; i<BITMAPSIZEWORD; i++) {
 //        printf("%d", bitmap[0]);
 //    }
     
+    printf("\n%s\\>", cwdb.dname);
     if (debug) printf("%s\n", __func__);
     return 0;
 }
@@ -480,6 +479,9 @@ int do_mvdir(char *name, char *size) {
     if (find_dir == 0) {
         printf("Directory '%s' not found.\n", name);
     }
+
+    ls(cwdb);
+    printf("\n%s\\>", cwdb.dname);
 
     if (debug) printf("%s\n", __func__);
     return 0;
@@ -593,6 +595,9 @@ int do_rmfil(char *name, char *size) {
 
     write_block( &cwdb, cwd);
 
+    ls(cwdb); 
+    printf("\n%s\\>", cwdb.dname);
+
     if (debug) printf("%s\n", __func__);
     return 0;
 }
@@ -629,6 +634,9 @@ int do_mvfil(char *name, char *size) {
     if (find_fil == 0) {
         printf("File '%s' not found.\n", name);
     }
+
+    ls(cwdb); 
+    printf("\n%s\\>", cwdb.dname);
 
     if (debug) printf("%s\n", __func__);
     return 0;
@@ -722,7 +730,10 @@ int do_szfil(char *name, char *size) { //christina
         printf("Your file size is the same as the original!\n");
         return -1;
     }
-    
+
+    ls(current_dir); 
+    printf("\n%s\\>", current_dir.dname);
+
     if (debug) printf("%s\n", __func__);
     return 0;
 }
