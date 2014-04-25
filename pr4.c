@@ -729,7 +729,7 @@ int do_szfil(char *name, char *size) { //christina
     temp_block_id.fsize = size_of_file;
     write_block(&temp_block_id, file_bid);
 
-    if(debug) ls(current_dir);
+    ls(current_dir);
     printf("\n%s\\>", current_dir.dname);
 
     if (debug) printf("%s\n", __func__);
