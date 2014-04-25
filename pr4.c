@@ -399,7 +399,6 @@ int do_rmdir(char *name, char *size) {
     
     uint32_t bitmap[BITMAPSIZEWORD];
     dir_desc cwdb, rmdb;
-    file_desc rmfb;
     read_block( &cwdb, cwd);
     for (int i = 0; i < 5; i++) {
         read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
@@ -416,9 +415,9 @@ int do_rmdir(char *name, char *size) {
                 if (cwdb.e[i].type == 0) {
                     read_block( &rmdb, cwdb.e[i].bid);
                 }
-                if ((!strcmp(rmdb.dname, name)) || (!strcmp(name, "-all"))) {
-                    find_dir = 1;
+                if (((!strcmp(rmdb.dname, name)) && (cwdb.e[i].type == 0)) || (!strcmp(name, "-all"))) {
                     if (cwdb.e[i].type == 0) {
+                        find_dir = 1;
                         cwd = cwdb.e[i].bid;
                         char *tname = "-all";
                         do_rmdir(tname, NULL);
@@ -524,8 +523,47 @@ int do_mkfil(char *name, char *size) {
 }
 
 int do_rmfil(char *name, char *size) {
+    
+    uint32_t bitmap[BITMAPSIZEWORD];
+    dir_desc cwdb;
+    file_desc rmfb;
+    read_block( &cwdb, cwd);
+    for (int i = 0; i < 5; i++) {
+        read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+    }
+    
+    int find_fil = 0;
+    for (int i = 0; i < 190; i++){
+        if (cwdb.e[i].bid > 0) {
+            int t_a = cwdb.e[i].bid / 32;
+            int t_b = cwdb.e[i].bid % 32;
+            if ((bitmap[t_a] & (1 << t_b))) {
+                //            printf("block %d is under this directory \n", cwdb.e[i].bid);
+                if (cwdb.e[i].type == 1) {
+                    read_block( &rmfb, cwdb.e[i].bid);
+                }
+                if (!strcmp(rmfb.fname, name)) {
+                    find_fil = 1;
+                    for (int i = 0; i < 5; i++) {
+                        read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+                    }
+                    clear_bit(bitmap, cwdb.e[i].bid);
+                    for (int i = 0; i < 5; i++) {
+                        write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+                    }
+                    cwdb.e[i].bid = 0;
+                }
+            }
+        }
+    }
+    if (find_fil == 0) {
+        printf("File '%s' not found.\n", name);
+    }
+
+    write_block( &cwdb, cwd);
+
     if (debug) printf("%s\n", __func__);
-    return -1;
+    return 0;
 }
 
 int do_mvfil(char *name, char *size) {
