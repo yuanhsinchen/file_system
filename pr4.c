@@ -246,7 +246,6 @@ void dfs(uint16_t bid)
     ls(d);
     for (i = 0; i <  190; i++) {
         if ((d.e[i].bid) && (!d.e[i].type)) {
-            printf("bid %d\n", d.e[i].bid);
             dfs(d.e[i].bid);
         }
     }
