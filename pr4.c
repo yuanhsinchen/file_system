@@ -216,7 +216,6 @@ int add_block(file_desc *file, int bid){
 
 int ls(dir_desc dir)
 {
-    int dnum = dir.dnum;
     int i = 0;
     file_desc f;
     dir_desc d;
@@ -353,7 +352,6 @@ int do_chdir(char *name, char *size) {
 }
 
 int do_mkdir(char *name, char *size) {
-    superblock *sb;
     uint32_t bitmap[BITMAPSIZEWORD];
     int empty_block = 0;
     int i;
