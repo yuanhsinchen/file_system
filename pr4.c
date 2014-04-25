@@ -477,7 +477,7 @@ int do_mvdir(char *name, char *size) {
             }
         }
     }
-    if ((find_dir == 0) && (strcmp(name, "-all"))) {
+    if (find_dir == 0) {
         printf("Directory '%s' not found.\n", name);
     }
 
@@ -598,8 +598,40 @@ int do_rmfil(char *name, char *size) {
 }
 
 int do_mvfil(char *name, char *size) {
+
+    uint32_t bitmap[BITMAPSIZEWORD];
+    dir_desc cwdb;
+    file_desc mvfb;
+    read_block( &cwdb, cwd);
+    for (int i = 0; i < 5; i++) {
+        read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+    }
+    
+    int find_fil = 0;
+    for (int i = 0; i < 190; i++){
+        if (cwdb.e[i].bid > 0) {
+            int t_a = cwdb.e[i].bid / 32;
+            int t_b = cwdb.e[i].bid % 32;
+            if ((bitmap[t_a] & (1 << t_b))) {
+                //            printf("block %d is under this directory \n", cwdb.e[i].bid);
+                if (cwdb.e[i].type == 1) {
+                    read_block( &mvfb, cwdb.e[i].bid);
+                    if (!strcmp(mvfb.fname, name)) {
+                        find_fil = 1;
+
+                        strcpy(mvfb.fname,size);
+                        write_block(&mvfb, cwdb.e[i].bid);
+                    }
+                }
+            }
+        }
+    }
+    if (find_fil == 0) {
+        printf("File '%s' not found.\n", name);
+    }
+
     if (debug) printf("%s\n", __func__);
-    return -1;
+    return 0;
 }
 
 int do_szfil(char *name, char *size) { //christina
