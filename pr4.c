@@ -399,11 +399,13 @@ int do_rmdir(char *name, char *size) {
     
     uint32_t bitmap[BITMAPSIZEWORD];
     dir_desc cwdb, rmdb;
+    file_desc rmfb;
     read_block( &cwdb, cwd);
     for (int i = 0; i < 5; i++) {
         read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
     }
     
+    int tcwd = cwd;
     int find_dir = 0;
     for (int i = 0; i < 190; i++){
         if (cwdb.e[i].bid > 0) {
@@ -413,27 +415,36 @@ int do_rmdir(char *name, char *size) {
                 //            printf("block %d is under this directory \n", cwdb.e[i].bid);
                 if (cwdb.e[i].type == 0) {
                     read_block( &rmdb, cwdb.e[i].bid);
-                    //              printf("it is a directory (%s)\n", todb.dname);
-                    if (!strcmp(rmdb.dname, name)) {
-                        find_dir = 1;
-                        clear_bit(bitmap, cwdb.e[i].bid);
-                        cwdb.e[i].bid = 0;
-                        for (i = 0; i < 5; i++) {
-                            write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
-                        }
-                        write_block( &cwdb, cwd);
+                }
+                if ((!strcmp(rmdb.dname, name)) || (!strcmp(name, "-all"))) {
+                    find_dir = 1;
+                    if (cwdb.e[i].type == 0) {
+                        cwd = cwdb.e[i].bid;
+                        char *tname = "-all";
+                        do_rmdir(tname, NULL);
+                        cwd = tcwd;
                     }
+                    for (int i = 0; i < 5; i++) {
+                        read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+                    }
+                    clear_bit(bitmap, cwdb.e[i].bid);
+                    for (int i = 0; i < 5; i++) {
+                        write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+                    }
+                    cwdb.e[i].bid = 0;
                 }
             }
         }
     }
-    if (find_dir == 0) {
+    if ((find_dir == 0) && (strcmp(name, "-all"))) {
         printf("Directory '%s' not found.\n", name);
     }
+
+    write_block( &cwdb, cwd);
     
-    for (int i=0; i<BITMAPSIZEWORD; i++) {
-        printf("%d", bitmap[i]);
-    }
+//    for (int i=0; i<BITMAPSIZEWORD; i++) {
+//        printf("%d", bitmap[0]);
+//    }
     
     if (debug) printf("%s\n", __func__);
     return 0;
