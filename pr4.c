@@ -138,7 +138,7 @@ void set_bit(uint32_t *bitmap, int n) {
 uint16_t empty_bid(uint32_t *bitmap) {
     int i, j;
     for (i = 0; i < BITMAPSIZEWORD; i++) {
-        if ((bitmap[i] == 0xFFFFFFFF))
+        if (bitmap[i] == 0xFFFFFFFF)
             continue;
         for (j = 0; j < 32; j++) {
             if (!(bitmap[i] & (1 << j)))
@@ -199,87 +199,58 @@ void update_parent(dir_desc *update, int file_or_dir, int bid) {
     fprintf(stderr, "ERROR: NOT ENOUGH SPACE IN DIRECTORY\n");
 }
 
-void add_block(file_desc *file, int bid){
+int add_block(file_desc *file, int bid){
     for(int i=0; i<382; i++){
         if(file->bid[i] == 0) {
             file->bid[i] = bid;
-            printf ("wrote %d to file[%d]\n", bid, i);
-            return;
+            if(debug)
+                printf ("wrote %d to file[%d]\n", bid, i);
+            return 0;
         }
     }
     
-    fprintf(stderr, "ERROR: %s TOO LARGE", file->fname);
+    fprintf(stderr, "ERROR: %s TOO LARGE\n", file->fname);
+    return -1;
 }
 
-//the next two functions are wholly unncessary but i wrote both of them
-//before i found the function atoi() so i'm keeping them out of spite.
-int exp10(int pow){
-    int value=10;
-    if(pow == 0)
-        return 1;
-    else{
-        
-        for(int i=1; i < pow; i++){
-            value *= 10;
-        }
-    }
-    
-    return value;
-}
-
-int parse_char_to_int(char *number){
-    int int_size=0;
-    int count=0;
-    for(int i=0; number[i] != '\0'; i++){
-        count++;
-    }
-    
-    int digit = count-1;
-    for(int j=0; j<count; j++){
-        int_size += (number[j]-'0')*exp10(digit);
-        digit--;
-    }
-    
-    return int_size;
-}
 
 int ls(dir_desc dir)
 {
-  int dnum = dir.dnum;
-  int i = 0;
-  file_desc f;
-  dir_desc d;
-
-  printf("--------\n");
-  while (dnum) {
-    if (dir.e[i].bid) {
-      if (dir.e[i].type){
-        read_block(&f, dir.e[i].bid);
-        printf("%s\n", f.fname);
-      } else {
-        read_block(&d, dir.e[i].bid);
-        printf("%s\/\n", d.dname);
-      }
-      dnum--;
+    int dnum = dir.dnum;
+    int i = 0;
+    file_desc f;
+    dir_desc d;
+    
+    printf("--------\n");
+    while (dnum) {
+        if (dir.e[i].bid) {
+            if (dir.e[i].type){
+                read_block(&f, dir.e[i].bid);
+                printf("%s\n", f.fname);
+            } else {
+                read_block(&d, dir.e[i].bid);
+                printf("%s\/\n", d.dname);
+            }
+            dnum--;
+        }
+        i++;
     }
-    i++;
-  }
-  printf("\n");
+    printf("\n");
 }
 
 void dfs(uint16_t bid)
 {
-  int i;
-  dir_desc d;
-
-  read_block(&d, bid);
-  printf("%s: \n", d.dname);
-  ls(d);
-  for (i = 0; i <  190; i++) {
-    if ((d.e[i].bid) && (!d.e[i].type)) {
-      dfs(d.e[i].bid);
+    int i;
+    dir_desc d;
+    
+    read_block(&d, bid);
+    printf("%s: \n", d.dname);
+    ls(d);
+    for (i = 0; i <  190; i++) {
+        if ((d.e[i].bid) && (!d.e[i].type)) {
+            dfs(d.e[i].bid);
+        }
     }
-  }
 }
 
 /*--------------------------------------------------------------------------------*/
@@ -311,7 +282,6 @@ int do_root(char *name, char *size) {
     strcpy(root.dname, "root");
     set_bit(bitmap, 6);
     root.parbid = 6;
-    
     sb.root_bid = 6;
     
     /* write descriptors to blocks*/
@@ -320,23 +290,24 @@ int do_root(char *name, char *size) {
         write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
     //print_block(disk, 1);
     write_block(&root, 6);
-
-    printf("\n%s\\>", root.dname);
-
+    
+    if(debug)
+        printf("\n%s\\>", root.dname);
+    
     if (debug) printf("%s\n", __func__);
     return 0;
 }
 
 int do_print(char *name, char *size)
 {
-  dir_desc cwdd;
-
-  read_block(&cwdd, cwd);
-  dfs(cwd);
-
-  printf("\n%s\\>", cwdd.dname);
-  if (debug) printf("%s\n", __func__);
-  return 0;
+    dir_desc cwdd;
+    
+    read_block(&cwdd, cwd);
+    dfs(cwd);
+    
+    printf("\n%s\\>", cwdd.dname);
+    if (debug) printf("%s\n", __func__);
+    return 0;
 }
 
 int do_chdir(char *name, char *size) {
@@ -345,43 +316,43 @@ int do_chdir(char *name, char *size) {
     dir_desc cwdb, todb;
     read_block( &cwdb, cwd);
     for (int i = 0; i < 5; i++) {
-      read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+        read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
     }
     if (!strcmp(name, "..")) {
-      cwd = cwdb.parbid;
-      read_block( &cwdb, cwd);
+        cwd = cwdb.parbid;
+        read_block( &cwdb, cwd);
     }
     else {
-      int find_dir = 0;
-      for (int i = 0; i < 190; i++){
-        if (cwdb.e[i].bid > 0) {
-          int t_a = cwdb.e[i].bid / 32;
-          int t_b = cwdb.e[i].bid % 32;
-          if ((bitmap[t_a] & (1 << t_b))) {
-//            printf("block %d is under this directory \n", cwdb.e[i].bid);
-            if (cwdb.e[i].type == 0) {
-              read_block( &todb, cwdb.e[i].bid);
-//              printf("it is a directory (%s)\n", todb.dname);
-              if (!strcmp(todb.dname, name)) {
-                find_dir = 1;
-                cwd = cwdb.e[i].bid;
-                read_block( &cwdb, cwd);
-              }
+        int find_dir = 0;
+        for (int i = 0; i < 190; i++){
+            if (cwdb.e[i].bid > 0) {
+                int t_a = cwdb.e[i].bid / 32;
+                int t_b = cwdb.e[i].bid % 32;
+                if ((bitmap[t_a] & (1 << t_b))) {
+                    //            printf("block %d is under this directory \n", cwdb.e[i].bid);
+                    if (cwdb.e[i].type == 0) {
+                        read_block( &todb, cwdb.e[i].bid);
+                        //              printf("it is a directory (%s)\n", todb.dname);
+                        if (!strcmp(todb.dname, name)) {
+                            find_dir = 1;
+                            cwd = cwdb.e[i].bid;
+                            read_block( &cwdb, cwd);
+                        }
+                    }
+                }
             }
-          }
         }
-      }
-      if (find_dir == 0) {
-        printf("Directory '%s' not found.\n", name);
-      }
+        if (find_dir == 0) {
+            printf("Directory '%s' not found.\n", name);
+        }
     }
     printf("\n%s\\>", cwdb.dname);
     
-//    printf("CD %d = (%d, %d)\n", to_dir, to_dir_block, to_dir_bit);
+    //    printf("CD %d = (%d, %d)\n", to_dir, to_dir_block, to_dir_bit);
     
     if (debug) printf("%s\n", __func__);
     return 0;
-
+    
 }
 
 int do_mkdir(char *name, char *size) {
@@ -416,54 +387,54 @@ int do_mkdir(char *name, char *size) {
     write_block(&current_dir, cwd); //write back to block
     
     ls(current_dir);
-
+    
     printf("\n%s\\>", current_dir.dname);
-
+    
     if (debug) printf("%s\n", __func__);
     return 0;
 }
 
 int do_rmdir(char *name, char *size) {
-
+    
     
     uint32_t bitmap[BITMAPSIZEWORD];
     dir_desc cwdb, rmdb;
     read_block( &cwdb, cwd);
     for (int i = 0; i < 5; i++) {
-      read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+        read_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
     }
-
+    
     int find_dir = 0;
     for (int i = 0; i < 190; i++){
-      if (cwdb.e[i].bid > 0) {
-        int t_a = cwdb.e[i].bid / 32;
-        int t_b = cwdb.e[i].bid % 32;
-        if ((bitmap[t_a] & (1 << t_b))) {
-//            printf("block %d is under this directory \n", cwdb.e[i].bid);
-          if (cwdb.e[i].type == 0) {
-            read_block( &rmdb, cwdb.e[i].bid);
-//              printf("it is a directory (%s)\n", todb.dname);
-            if (!strcmp(rmdb.dname, name)) {
-              find_dir = 1;
-              clear_bit(bitmap, cwdb.e[i].bid);
-              cwdb.e[i].bid = 0;
-              for (i = 0; i < 5; i++) {
-                write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
-              }
-              write_block( &cwdb, cwd);
+        if (cwdb.e[i].bid > 0) {
+            int t_a = cwdb.e[i].bid / 32;
+            int t_b = cwdb.e[i].bid % 32;
+            if ((bitmap[t_a] & (1 << t_b))) {
+                //            printf("block %d is under this directory \n", cwdb.e[i].bid);
+                if (cwdb.e[i].type == 0) {
+                    read_block( &rmdb, cwdb.e[i].bid);
+                    //              printf("it is a directory (%s)\n", todb.dname);
+                    if (!strcmp(rmdb.dname, name)) {
+                        find_dir = 1;
+                        clear_bit(bitmap, cwdb.e[i].bid);
+                        cwdb.e[i].bid = 0;
+                        for (i = 0; i < 5; i++) {
+                            write_block(&bitmap[i * BLOCKSIZEWORD], i + 1);
+                        }
+                        write_block( &cwdb, cwd);
+                    }
+                }
             }
-          }
         }
-      }
     }
     if (find_dir == 0) {
-      printf("Directory '%s' not found.\n", name);
+        printf("Directory '%s' not found.\n", name);
     }
-
+    
     for (int i=0; i<BITMAPSIZEWORD; i++) {
-      printf("%d", bitmap[i]);
+        printf("%d", bitmap[i]);
     }
-
+    
     if (debug) printf("%s\n", __func__);
     return 0;
 }
@@ -475,7 +446,7 @@ int do_mvdir(char *name, char *size) {
 
 // TODO: check file size, if file is bigger than block store it on multiple blocks
 int do_mkfil(char *name, char *size) {
-    superblock *sb;
+
     uint32_t bitmap[BITMAPSIZEWORD];
     uint16_t empty_block = 0;
     dir_desc current_dir;
@@ -483,11 +454,11 @@ int do_mkfil(char *name, char *size) {
     int number_of_blocks;
     int file_desc_block;
     file_desc new_file_desc;
-
+    
     int k=1;
     int j;
     int i;
-
+    
     if(size[0] == '\0')
         file_size = 0;
     number_of_blocks = 1 + ((file_size - 1) / BLOCKSIZE);
@@ -495,8 +466,9 @@ int do_mkfil(char *name, char *size) {
     memset(&new_file_desc, 0, sizeof(file_desc));
     strcpy(new_file_desc.fname, name);
     new_file_desc.fsize = file_size;
-    memset(new_file_desc.bid, 0, 381);
     
+    read_block(&current_dir, cwd); //read current_dir
+    //store file descriptor
     for (i = 1; i <= 5; i++) {
         read_block(bitmap, i);
         file_desc_block = empty_bid(bitmap);
@@ -515,26 +487,27 @@ int do_mkfil(char *name, char *size) {
             empty_block = empty_bid(bitmap);
             if (empty_block != 0){
                 set_bit(bitmap, empty_block);
-                add_block(&new_file_desc, empty_block);
+                if(debug) printf("set bit %d to %d\n", empty_block, 1);
+                if(add_block(&new_file_desc, empty_block) == -1)
+                    break;
                 k++;
             }
         }
-
+        
         if(k-1 == number_of_blocks){
             write_block(bitmap, j);
-            //print_bitmap(bitmap, 20);
             break;
         }
     }
     
-    read_block(&current_dir, cwd); //read current_dir
     update_parent(&current_dir, 1, file_desc_block);    //update parent
     current_dir.dnum++;
-    //printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
+//    printf("%d, %d", current_dir.e[0].bid, current_dir.e[0].type); //check
     write_block(&current_dir, cwd);
+    
     ls(current_dir);
     printf("\n%s\\>", current_dir.dname);
-
+    
     if (debug) printf("%s\n", __func__);
     return 0;
 }
@@ -566,8 +539,16 @@ int do_szfil(char *name, char *size) { //christina
     int size_of_file = atoi(size);
     int found=0;
     
+    
+    
     //read files from directory
     read_block(&current_dir, cwd);
+    /*
+     for(int i=0; i < 190; i++){
+     if(current_dir.e[i].bid != 0)
+     printf("%d ", current_dir.e[i].bid);
+     }
+     */
     for(int i=0; i < 190; i++){
         if(current_dir.e[i].type == 1){
             read_block(&temp_block_id, current_dir.e[i].bid);
@@ -588,25 +569,46 @@ int do_szfil(char *name, char *size) { //christina
     uint32_t bitmap[BITMAPSIZEWORD];
     uint16_t empty_block = 0;
     
-    for(int i=0; i < 382; i++){
-        printf("%d ", temp_block_id.bid[i]);
-    }
-    
-    for (int j = 1; j <= 5; j++) {
-        read_block(bitmap, j);
-        while(k <= num_of_blocks && k < BITMAPSIZEWORD) {
-            empty_block = empty_bid(bitmap);
-            if (empty_block != 0){
-                set_bit(bitmap, empty_block);
-                //print_bitmap(bitmap, 20);
-                add_block(&temp_block_id, empty_block);
-                k++;
+    //if the file is larger than original, add blocks
+    if(temp_block_id.fsize < size_of_file){
+        for (int j = 1; j <= 5; j++) {
+            read_block(bitmap, j);
+            while(k <= num_of_blocks && k < BITMAPSIZEWORD) {
+                empty_block = empty_bid(bitmap);
+                if (empty_block != 0){
+                    set_bit(bitmap, empty_block);
+                    //print_bitmap(bitmap, 20);
+                    add_block(&temp_block_id, empty_block);
+                    k++;
+                }
+            }
+            if(k-1 == num_of_blocks){
+                write_block(bitmap, j);
+                break;
             }
         }
-        if(k == num_of_blocks){
-            break;
-            write_block(bitmap, j);
+    }
+    
+    //otherwise remove blocks
+    else if (temp_block_id.fsize > size_of_file){
+        //calculate blocks to remove
+        int remove_blocks = (1 + ((temp_block_id.fsize - 1) / BLOCKSIZE)) - num_of_blocks;
+        if(debug) printf("Current disk bitmap %d\n", 1+((cwd-1)/BLOCKSIZE));
+        //read cwd bitmap
+        read_block(bitmap, 1+((cwd-1)/BLOCKSIZE));
+        if (debug) printf(" remove: %d original: %d\n", remove_blocks, (1 + ((temp_block_id.fsize - 1) / BLOCKSIZE)));
+        if(debug) print_bitmap(bitmap, 20);
+        for(int m=0; m < remove_blocks; m++){
+            clear_bit(bitmap, m);
         }
+        
+        write_block(bitmap, 1+((cwd-1)/BLOCKSIZE));
+        if(debug) print_bitmap(bitmap, 1);
+    }
+    
+    else{
+        printf("Your file size is the same as the original!\n");
+        return -1;
     }
     
     if (debug) printf("%s\n", __func__);
